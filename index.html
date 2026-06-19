@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero Financiero Automatizado</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 550px;
+            width: 100%;
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; color: #38bdf8; margin-bottom: 5px; font-size: 24px; }
+        p.subtitle { text-align: center; color: #94a3b8; margin-top: 0; font-size: 14px; margin-bottom: 20px; }
+        
+        .portfolio-summary {
+            background: linear-gradient(135deg, #1e1b4b, #2e1065);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #4c1d95;
+        }
+        .summary-val { font-size: 28px; font-weight: bold; color: #34d399; margin-top: 5px; }
+        .summary-lbl { font-size: 12px; color: #a78bfa; font-weight: 600; text-transform: uppercase; }
+        
+        .section-title {
+            font-size: 14px; color: #38bdf8; text-transform: uppercase; font-weight: bold;
+            margin-top: 20px; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px;
+        }
+
+        .api-box { background: #334155; padding: 12px; border-radius: 8px; margin-bottom: 15px; }
+        .api-box label { display: block; font-size: 12px; color: #94a3b8; font-weight: bold; }
+        .api-box input {
+            width: 100%; padding: 8px; margin-top: 5px; background: #0f172a; border: 1px solid #475569;
+            border-radius: 6px; color: #fff; box-sizing: border-box; font-size: 14px;
+        }
+        
+        button {
+            width: 100%; padding: 12px; background: #0ea5e9; color: white; border: none;
+            border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background: #0284c7; }
+
+        .ticker-card { background: #1e293b; border-bottom: 1px solid #334155; padding: 12px 0; }
+        .card-main { display: flex; justify-content: space-between; align-items: center; }
+        .ticker-name { font-weight: bold; font-size: 16px; }
+        .ticker-company { font-size: 11px; color: #64748b; }
+        
+        .holdings-inputs { display: flex; gap: 8px; margin-top: 8px; background: #1e293b; padding: 4px 0; }
+        .holdings-inputs input {
+            flex: 1; padding: 6px; background: #0f172a; border: 1px solid #334155;
+            border-radius: 4px; color: white; font-size: 12px; text-align: center;
+        }
+        
+        .ticker-price-box { text-align: right; }
+        .ticker-price { font-weight: bold; font-size: 15px; }
+        .ticker-holding-val { font-size: 14px; font-weight: bold; color: #f8fafc; }
+        .ticker-change { font-size: 12px; font-weight: 500; margin-top: 2px; }
+        
+        .sube { color: #22c55e; }
+        .baja { color: #ef4444; }
+        .igual { color: #94a3b8; }
+        
+        #status { text-align: center; font-size: 12px; color: #94a3b8; margin-top: 10px; }
+        .btn-config {
+            background: none; border: none; color: #64748b; font-size: 11px; 
+            text-decoration: underline; margin-top: 25px; cursor: pointer; padding: 5px; width: auto; display: block; margin-left: auto; margin-right: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📈 Portfolio Inteligente</h1>
+    <p class="subtitle">Sincronización Internacional y Local Autónoma</p>
+    
+    <div class="portfolio-summary">
+        <span class="summary-lbl">Patrimonio Neto Total</span>
+        <div class="summary-val" id="total-portfolio">U$S 0.00</div>
+    </div>
+    
+    <div class="api-box" id="contenedor-api">
+        <label for="api-key">PEGÁ ACÁ TU API KEY DE FINNHUB:</label>
+        <input type="text" id="api-key" placeholder="Pegá el código largo acá">
+    </div>
+
+    <button onclick="actualizarTodo()">🔄 Actualizar Mercados</button>
+    <div id="status"></div>
+
+    <div class="section-title">Renta Variable & Cripto (Wall Street)</div>
+    <div class="ticker-list" id="lista-acciones"></div>
+
+    <div class="section-title">Obligaciones Negociables (En Vivo Arg)</div>
+    <div class="ticker-list" id="lista-ons"></div>
+    
+    <button class="btn-config" onclick="mostrarConfigApi()">⚙️ Configurar API Key</button>
+</div>
+
+<script>
+    const activosMerval = [
+        { ticker: "AAPL", nombre: "Apple Inc." },
+        { ticker: "MSFT", nombre: "Microsoft" },
+        { ticker: "TSLA", nombre: "Tesla" },
+        { ticker: "NVDA", nombre: "NVIDIA" },
+        { ticker: "SPCX", nombre: "SpaceX" },
+        { ticker: "META", nombre: "Meta Platforms" },
+        { ticker: "SPY",  nombre: "S&P 500 ETF" },
+        { ticker: "QQQ",  nombre: "Nasdaq 100 ETF" },
+        { ticker: "GLD",  nombre: "Oro (ETF GLD)" },
+        { ticker: "BINANCE:BTCUSDT", nombre: "Bitcoin" }
+    ];
+
+    // Tickers en dólares MEP para buscar en la lista de Data912
+    const listaONs = [
+        { id: "YPCUO", nombre: "YPF Luz 2026 Clase XIV" },
+        { id: "YMCHO", nombre: "YPF Corp 2029" },
+        { id: "MGCXO", nombre: "Pampa Energía 2026" }
+    ];
+
+    let preciosAcciones = {};
+    let preciosONs = {};
+
+    window.onload = function() {
+        let claveGuardada = localStorage.getItem('finnhub_key');
+        if(claveGuardada) {
+            document.getElementById('api-key').value = claveGuardada;
+            document.getElementById('contenedor-api').style.display = "none";
+        }
+        renderTableros();
+        actualizarTodo();
+    };
+
+    function renderTableros() {
+        // Render de Acciones
+        const listaAcc = document.getElementById('lista-acciones');
+        listaAcc.innerHTML = activosMerval.map(a => {
+            let tick = a.ticker;
+            let cant = localStorage.getItem(`cant_${tick}`) || "";
+            let costo = localStorage.getItem(`costo_${tick}`) || "";
+            let tickerMostrar = tick === 'BINANCE:BTCUSDT' ? 'BTC' : tick;
+
+            return `
+                <div class="ticker-card">
+                    <div class="card-main">
+                        <div>
+                            <span class="ticker-name">${tickerMostrar}</span>
+                            <span class="ticker-company">${a.nombre}</span>
+                        </div>
+                        <div class="ticker-price-box" id="box-${tick}">
+                            <span class="ticker-price">--</span>
+                        </div>
+                    </div>
+                    <div class="holdings-inputs">
+                        <input type="number" step="any" placeholder="Cant. Nominal" value="${cant}" onchange="guardarDato('${tick}', 'cant', this.value)">
+                        <input type="number" step="any" placeholder="Precio Compra (U$S)" value="${costo}" onchange="guardarDato('${tick}', 'costo', this.value)">
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Render de ONs
+        const contenedorONs = document.getElementById('lista-ons');
+        contenedorONs.innerHTML = listaONs.map(on => {
+            let id = on.id;
+            let cant = localStorage.getItem(`cant_${id}`) || "";
+            let costo = localStorage.getItem(`costo_${id}`) || "";
+
+            return `
+                <div class="ticker-card">
+                    <div class="card-main">
+                        <div>
+                            <span class="ticker-name">${id}</span>
+                            <span class="ticker-company">${on.nombre}</span>
+                        </div>
+                        <div class="ticker-price-box" id="box-${id}">
+                            <span class="ticker-price">--</span>
+                        </div>
+                    </div>
+                    <div class="holdings-inputs">
+                        <input type="number" step="any" placeholder="Cant. Nominales" value="${cant}" onchange="guardarDato('${id}', 'cant', this.value)">
+                        <input type="number" step="any" placeholder="Precio Compra (U$S)" value="${costo}" onchange="guardarDato('${id}', 'costo', this.value)">
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function guardarDato(id, tipo, valor) {
+        localStorage.setItem(`${tipo}_${id}`, valor);
+        calcularTodo();
+    }
+
+    function mostrarConfigApi() {
+        document.getElementById('contenedor-api').style.display = "block";
+    }
+
+    async function actualizarTodo() {
+        const apiKey = document.getElementById('api-key').value.trim();
+        const status = document.getElementById('status');
+        
+        status.innerText = "Sincronizando mercados...";
+
+        // 1. Consultar Finnhub
+        if (apiKey) {
+            localStorage.setItem('finnhub_key', apiKey);
+            document.getElementById('contenedor-api').style.display = "none";
+            for (let a of activosMerval) {
+                try {
+                    const url = `https://finnhub.io/api/v1/quote?symbol=${a.ticker}&token=${apiKey}`;
+                    const respuesta = await fetch(url);
+                    const datos = await respuesta.json();
+                    if (datos.c !== 0 && datos.c !== null) {
+                        preciosAcciones[a.ticker] = { precio: datos.c, cambio: datos.dp };
+                    }
+                } catch (e) { console.log("Error Finnhub: " + a.ticker); }
+            }
+        }
+
+        // 2. Consultar Data912 usando un Proxy público para esquivar el bloqueo CORS
+        try {
+            const urlOriginal = "https://data912.com/live/arg_corp";
+            const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
+            
+            const respuestaArg = await fetch(urlProxy);
+            const dataProxy = await respuestaArg.json();
+            const datosArg = JSON.parse(dataProxy.contents); // Extraemos los datos reales limpiados por el proxy
+            
+            if (Array.isArray(datosArg)) {
+                datosArg.forEach(item => {
+                    preciosONs[item.symbol] = {
+                        precio: item.c,
+                        cambio: item.pct_change
+                    };
+                });
+            }
+        } catch (e) { 
+            console.log("Error al conectar con Data912 vía Proxy"); 
+        }
+
+        calcularTodo();
+        status.innerText = "Sincronización completa.";
+    }
+
+    function calcularTodo() {
+        let totalGeneral = 0;
+
+        // Calcular Sección Internacional
+        for (let a of activosMerval) {
+            let tick = a.ticker;
+            let box = document.getElementById(`box-${tick}`);
+            if (!box) continue;
+
+            let info = preciosAcciones[tick];
+            let cant = parseFloat(localStorage.getItem(`cant_${tick}`)) || 0;
+            let costo = parseFloat(localStorage.getItem(`costo_${tick}`)) || 0;
+
+            if (!info) {
+                if (cant > 0) box.innerHTML = `<span class="ticker-holding-val">U$S ${(cant * costo).toFixed(2)}</span>`;
+                continue;
+            }
+
+            let pActual = info.precio;
+            let cambio = info.cambio;
+            let claseColor = cambio > 0 ? "sube" : (cambio < 0 ? "baja" : "igual");
+            let signo = cambio > 0 ? "+" : "";
+
+            if (cant > 0) {
+                let valPos = cant * pActual;
+                totalGeneral += valPos;
+                let rend = costo > 0 ? ((pActual - costo) / costo) * 100 : 0;
+                let colRend = rend > 0 ? "sube" : (rend < 0 ? "baja" : "igual");
+
+                box.innerHTML = `
+                    <span class="ticker-holding-val">U$S ${valPos.toFixed(2)}</span>
+                    <div class="ticker-change ${colRend}" style="font-size:11px;">Hist: ${rend > 0 ? '+':''}${rend.toFixed(1)}%</div>
+                    <div class="ticker-change ${claseColor}" style="font-size:11px; opacity:0.7;">Hoy: ${signo}${cambio.toFixed(1)}%</div>
+                `;
+            } else {
+                box.innerHTML = `<span class="ticker-price">U$S ${pActual.toFixed(2)}</span><div class="ticker-change ${claseColor}">${signo}${cambio.toFixed(2)}%</div>`;
+            }
+        }
+
+        // Calcular Sección de Obligaciones Negociables Automáticas
+        for (let on of listaONs) {
+            let id = on.id;
+            let box = document.getElementById(`box-${id}`);
+            if (!box) continue;
+
+            let info = preciosONs[id];
+            let cant = parseFloat(localStorage.getItem(`cant_${id}`)) || 0;
+            let costo = parseFloat(localStorage.getItem(`costo_${id}`)) || 0;
+
+            if (info && info.precio > 0) {
+                let pActual = info.precio;
+                let cambioHoy = info.cambio;
+                
+                let valPos = cant * pActual;
+                totalGeneral += valPos;
+                
+                let rendHist = costo > 0 ? ((pActual - costo) / costo) * 100 : 0;
+                let colRend = rendHist > 0 ? "sube" : (rendHist < 0 ? "baja" : "igual");
+                let colHoy = cambioHoy > 0 ? "sube" : (cambioHoy < 0 ? "baja" : "igual");
+                let signoHoy = cambioHoy > 0 ? "+" : "";
+
+                if (cant > 0) {
+                    box.innerHTML = `
+                        <span class="ticker-holding-val">U$S ${valPos.toFixed(2)}</span>
+                        <div class="ticker-change ${colRend}" style="font-size:11px;">Hist: ${rendHist > 0 ? '+':''}${rendHist.toFixed(1)}%</div>
+                        <div class="ticker-change ${colHoy}" style="font-size:11px; opacity:0.7;">Hoy: ${signoHoy}${cambioHoy.toFixed(1)}%</div>
+                    `;
+                } else {
+                    box.innerHTML = `
+                        <span class="ticker-price">U$S ${pActual.toFixed(2)}</span>
+                        <div class="ticker-change ${colHoy}">${signoHoy}${cambioHoy.toFixed(2)}%</div>
+                    `;
+                }
+            } else {
+                if (cant > 0) {
+                    let valEstimado = cant * costo;
+                    totalGeneral += valEstimado;
+                    box.innerHTML = `<span class="ticker-holding-val">U$S ${valEstimado.toFixed(2)} (Cargando...)</span>`;
+                } else {
+                    box.innerHTML = `<span class="ticker-price">--</span>`;
+                }
+            }
+        }
+
+        // Mostrar total general arriba formateado
+        document.getElementById('total-portfolio').innerText = `U$S ${totalGeneral.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+</script>
+</body>
+</html>
