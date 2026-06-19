@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero Financiero Total</title>
+    <title>Tablero Financiero Automatizado</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -84,8 +84,8 @@
 <body>
 
 <div class="container">
-    <h1>📈 Portfolio Pro</h1>
-    <p class="subtitle">Control Total Fijo y Variable</p>
+    <h1>📈 Portfolio Inteligente</h1>
+    <p class="subtitle">Sincronización Internacional y Local Autónoma</p>
     
     <div class="portfolio-summary">
         <span class="summary-lbl">Patrimonio Neto Total</span>
@@ -97,13 +97,13 @@
         <input type="text" id="api-key" placeholder="Pegá el código largo acá">
     </div>
 
-    <button onclick="actualizarCotizaciones()">🔄 Actualizar Wall Street</button>
+    <button onclick="actualizarTodo()">🔄 Actualizar Mercados</button>
     <div id="status"></div>
 
-    <div class="section-title">Renta Variable & Cripto (En Vivo)</div>
+    <div class="section-title">Renta Variable & Cripto (Wall Street)</div>
     <div class="ticker-list" id="lista-acciones"></div>
 
-    <div class="section-title">Obligaciones Negociables (Renta Fija)</div>
+    <div class="section-title">Obligaciones Negociables (En Vivo Arg)</div>
     <div class="ticker-list" id="lista-ons"></div>
     
     <button class="btn-config" onclick="mostrarConfigApi()">⚙️ Configurar API Key</button>
@@ -123,15 +123,15 @@
         { ticker: "BINANCE:BTCUSDT", nombre: "Bitcoin" }
     ];
 
-    // Lista de ONs expandida y limpia
+    // Tickers exactos que figuran en tu JSON real
     const listaONs = [
-        { id: "YPCUO", nombre: "YPF Luz 2026 Clase XIV" },
-        { id: "YMCHO", nombre: "YPF Corp 2029" },
-        { id: "MGCXO", nombre: "Pampa Energía 2026" },
-        { id: "CSDOD", nombre: "Cresud 2026" }
+        { id: "TLCUO", nombre: "YPF Luz 2026 Clase XIV" },
+        { id: "YMCXO", nombre: "YPF Corp 2029" },
+        { id: "MGCXO", nombre: "Pampa Energía 2026" }
     ];
 
-    let preciosEnVivo = {};
+    let preciosAcciones = {};
+    let preciosONs = {};
 
     window.onload = function() {
         let claveGuardada = localStorage.getItem('finnhub_key');
@@ -140,7 +140,7 @@
             document.getElementById('contenedor-api').style.display = "none";
         }
         renderTableros();
-        if(claveGuardada) actualizarCotizaciones();
+        actualizarTodo();
     };
 
     function renderTableros() {
@@ -171,13 +171,12 @@
             `;
         }).join('');
 
-        // Render de ONs con entrada limpia de Cotización Actual
+        // Render de ONs
         const contenedorONs = document.getElementById('lista-ons');
         contenedorONs.innerHTML = listaONs.map(on => {
             let id = on.id;
             let cant = localStorage.getItem(`cant_${id}`) || "";
             let costo = localStorage.getItem(`costo_${id}`) || "";
-            let precioAct = localStorage.getItem(`precioAct_${id}`) || "";
 
             return `
                 <div class="ticker-card">
@@ -191,15 +190,12 @@
                         </div>
                     </div>
                     <div class="holdings-inputs">
-                        <input type="number" step="any" placeholder="Cant. Nominales" value="${cant}" onchange="guardarDato('${id}', 'cant', this.value)">
-                        <input type="number" step="any" placeholder="Precio Compra" value="${costo}" onchange="guardarDato('${id}', 'costo', this.value)">
-                        <input type="number" step="any" placeholder="Precio Actual U$S" value="${precioAct}" style="border: 1px solid #38bdf8;" onchange="guardarDato('${id}', 'precioAct', this.value)">
+                        <input type="number" step="any" placeholder="Nominales (Láminas)" value="${cant}" onchange="guardarDato('${id}', 'cant', this.value)">
+                        <input type="number" step="any" placeholder="Precio Compra (U$S)" value="${costo}" onchange="guardarDato('${id}', 'costo', this.value)">
                     </div>
                 </div>
             `;
         }).join('');
-
-        calcularTodo();
     }
 
     function guardarDato(id, tipo, valor) {
@@ -211,24 +207,51 @@
         document.getElementById('contenedor-api').style.display = "block";
     }
 
-    async function actualizarCotizaciones() {
+    async function actualizarTodo() {
         const apiKey = document.getElementById('api-key').value.trim();
         const status = document.getElementById('status');
-        if (!apiKey) return;
+        
+        status.innerText = "Sincronizando mercados...";
 
-        localStorage.setItem('finnhub_key', apiKey);
-        document.getElementById('contenedor-api').style.display = "none";
-        status.innerText = "Sincronizando Wall Street...";
-
-        for (let a of activosMerval) {
-            try {
-                const url = `https://finnhub.io/api/v1/quote?symbol=${a.ticker}&token=${apiKey}`;
-                const respuesta = await fetch(url);
-                const datos = await respuesta.json();
-                if (datos.c === 0 || datos.c === null) throw new Error();
-                preciosEnVivo[a.ticker] = { precio: datos.c, cambio: datos.dp };
-            } catch (e) { console.log("Error en " + a.ticker); }
+        // 1. Consultar Finnhub
+        if (apiKey) {
+            localStorage.setItem('finnhub_key', apiKey);
+            document.getElementById('contenedor-api').style.display = "none";
+            for (let a of activosMerval) {
+                try {
+                    const url = `https://finnhub.io/api/v1/quote?symbol=${a.ticker}&token=${apiKey}`;
+                    const respuesta = await fetch(url);
+                    const datos = await respuesta.json();
+                    if (datos.c !== 0 && datos.c !== null) {
+                        preciosAcciones[a.ticker] = { precio: datos.c, cambio: datos.dp };
+                    }
+                } catch (e) { console.log("Error Finnhub: " + a.ticker); }
+            }
         }
+
+        // 2. Consultar Data912 con Proxy e interpretación de datos exactos
+        try {
+            const urlOriginal = "https://data912.com/live/arg_corp";
+            const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
+            
+            const respuestaArg = await fetch(urlProxy);
+            const dataProxy = await respuestaArg.json();
+            const datosArg = JSON.parse(dataProxy.contents);
+            
+            if (Array.isArray(datosArg)) {
+                datosArg.forEach(item => {
+                    // Limpiamos y formateamos el precio c dividiéndolo por 100.000 para llevarlo a valor unitario real
+                    let precioLimpio = item.c / 100000;
+                    preciosONs[item.symbol] = {
+                        precio: precioLimpio,
+                        cambio: item.pct_change
+                    };
+                });
+            }
+        } catch (e) { 
+            console.log("Error en Data912"); 
+        }
+
         calcularTodo();
         status.innerText = "Sincronización completa.";
     }
@@ -236,13 +259,13 @@
     function calcularTodo() {
         let totalGeneral = 0;
 
-        // 1. Calcular Acciones
+        // Calcular Sección Internacional
         for (let a of activosMerval) {
             let tick = a.ticker;
             let box = document.getElementById(`box-${tick}`);
             if (!box) continue;
 
-            let info = preciosEnVivo[tick];
+            let info = preciosAcciones[tick];
             let cant = parseFloat(localStorage.getItem(`cant_${tick}`)) || 0;
             let costo = parseFloat(localStorage.getItem(`costo_${tick}`)) || 0;
 
@@ -272,30 +295,49 @@
             }
         }
 
-        // 2. Calcular ONs (Local seguro)
+        // Calcular Sección ONs con mapeo real de data912
         for (let on of listaONs) {
             let id = on.id;
             let box = document.getElementById(`box-${id}`);
             if (!box) continue;
 
+            let info = preciosONs[id];
             let cant = parseFloat(localStorage.getItem(`cant_${id}`)) || 0;
             let costo = parseFloat(localStorage.getItem(`costo_${id}`)) || 0;
-            let pActual = parseFloat(localStorage.getItem(`precioAct_${id}`)) || 0;
 
-            if (pActual > 0) {
+            if (info && info.precio > 0) {
+                let pActual = info.precio; 
+                let cambioHoy = info.cambio;
+                
+                // Si la ON cotiza por lámina (ej: U$S 1.50), la posición es Cantidad * Precio Actual
                 let valPos = cant * pActual;
                 totalGeneral += valPos;
-                let rend = costo > 0 ? ((pActual - costo) / costo) * 100 : 0;
-                let colRend = rend > 0 ? "sube" : (rend < 0 ? "baja" : "igual");
+                
+                let rendHist = costo > 0 ? ((pActual - costo) / costo) * 100 : 0;
+                let colRend = rendHist > 0 ? "sube" : (rendHist < 0 ? "baja" : "igual");
+                let colHoy = cambioHoy > 0 ? "sube" : (cambioHoy < 0 ? "baja" : "igual");
+                let signoHoy = cambioHoy > 0 ? "+" : "";
 
-                box.innerHTML = `
-                    <span class="ticker-holding-val">U$S ${valPos.toFixed(2)}</span>
-                    <div class="ticker-change ${colRend}" style="font-size:11px;">Hist: ${rend > 0 ? '+':''}${rend.toFixed(1)}%</div>
-                `;
-            } else if (cant > 0) {
-                box.innerHTML = `<span class="ticker-price" style="color:#64748b;">Falta Precio</span>`;
+                if (cant > 0) {
+                    box.innerHTML = `
+                        <span class="ticker-holding-val">U$S ${valPos.toFixed(2)}</span>
+                        <div class="ticker-change ${colRend}" style="font-size:11px;">Hist: ${rendHist > 0 ? '+':''}${rendHist.toFixed(1)}%</div>
+                        <div class="ticker-change ${colHoy}" style="font-size:11px; opacity:0.7;">Hoy: ${signoHoy}${cambioHoy.toFixed(1)}%</div>
+                    `;
+                } else {
+                    box.innerHTML = `
+                        <span class="ticker-price">U$S ${pActual.toFixed(4)}</span>
+                        <div class="ticker-change ${colHoy}">${signoHoy}${cambioHoy.toFixed(2)}%</div>
+                    `;
+                }
             } else {
-                box.innerHTML = `<span class="ticker-price">--</span>`;
+                if (cant > 0) {
+                    let valEstimado = cant * costo;
+                    totalGeneral += valEstimado;
+                    box.innerHTML = `<span class="ticker-holding-val">U$S ${valEstimado.toFixed(2)} (Sincro...)</span>`;
+                } else {
+                    box.innerHTML = `<span class="ticker-price">--</span>`;
+                }
             }
         }
 
