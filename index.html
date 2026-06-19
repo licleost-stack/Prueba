@@ -123,11 +123,11 @@
         { ticker: "BINANCE:BTCUSDT", nombre: "Bitcoin" }
     ];
 
-    // Tickers en dólares MEP para buscar en la lista de Data912
+    // Mapeo con los nombres exactos tal cual figuran en el JSON de data912
     const listaONs = [
-        { id: "YPCUO", nombre: "YPF Luz 2026 Clase XIV" },
-        { id: "YMCHO", nombre: "YPF Corp 2029" },
-        { id: "MGCXO", nombre: "Pampa Energía 2026" }
+        { id: "YPCUO - BYMA", mostrar: "YPCUO", nombre: "YPF Luz 2026 Clase XIV" },
+        { id: "YMCHO - BYMA", mostrar: "YMCHO", nombre: "YPF Corp 2029" },
+        { id: "MGCXO - BYMA", mostrar: "MGCXO", nombre: "Pampa Energía 2026" }
     ];
 
     let preciosAcciones = {};
@@ -182,10 +182,10 @@
                 <div class="ticker-card">
                     <div class="card-main">
                         <div>
-                            <span class="ticker-name">${id}</span>
+                            <span class="ticker-name">${on.mostrar}</span>
                             <span class="ticker-company">${on.nombre}</span>
                         </div>
-                        <div class="ticker-price-box" id="box-${id}">
+                        <div class="ticker-price-box" id="box-${id.replace(/\s+/g, '')}">
                             <span class="ticker-price">--</span>
                         </div>
                     </div>
@@ -229,14 +229,14 @@
             }
         }
 
-        // 2. Consultar Data912 usando un Proxy público para esquivar el bloqueo CORS
+        // 2. Consultar Data912 vía Proxy
         try {
             const urlOriginal = "https://data912.com/live/arg_corp";
             const urlProxy = `https://api.allorigins.win/get?url=${encodeURIComponent(urlOriginal)}`;
             
             const respuestaArg = await fetch(urlProxy);
             const dataProxy = await respuestaArg.json();
-            const datosArg = JSON.parse(dataProxy.contents); // Extraemos los datos reales limpiados por el proxy
+            const datosArg = JSON.parse(dataProxy.contents);
             
             if (Array.isArray(datosArg)) {
                 datosArg.forEach(item => {
@@ -247,7 +247,7 @@
                 });
             }
         } catch (e) { 
-            console.log("Error al conectar con Data912 vía Proxy"); 
+            console.log("Error en Data912"); 
         }
 
         calcularTodo();
@@ -293,10 +293,10 @@
             }
         }
 
-        // Calcular Sección de Obligaciones Negociables Automáticas
+        // Calcular Sección ONs con mapeo corregido
         for (let on of listaONs) {
             let id = on.id;
-            let box = document.getElementById(`box-${id}`);
+            let box = document.getElementById(`box-${id.replace(/\s+/g, '')}`);
             if (!box) continue;
 
             let info = preciosONs[id];
@@ -331,14 +331,13 @@
                 if (cant > 0) {
                     let valEstimado = cant * costo;
                     totalGeneral += valEstimado;
-                    box.innerHTML = `<span class="ticker-holding-val">U$S ${valEstimado.toFixed(2)} (Cargando...)</span>`;
+                    box.innerHTML = `<span class="ticker-holding-val">U$S ${valEstimado.toFixed(2)} (Sincro...)</span>`;
                 } else {
                     box.innerHTML = `<span class="ticker-price">--</span>`;
                 }
             }
         }
 
-        // Mostrar total general arriba formateado
         document.getElementById('total-portfolio').innerText = `U$S ${totalGeneral.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     }
 </script>
